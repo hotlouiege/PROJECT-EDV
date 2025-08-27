@@ -1,0 +1,253 @@
+<?php
+// escape_game.php
+?>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Escape the Obstacle Game</title>
+<style>
+  /* main page styling */
+  body {
+    margin: 0;
+    height: 100vh;
+    background: linear-gradient(180deg, #1e1e2f, #0d0d17);
+    color: #fff;
+    font-family: 'Orbitron', Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    user-select: none;
+  }
+
+  /* scoreboard styling */
+  #scoreBoard {
+    font-size: 32px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-shadow: 0 0 8px cyan, 0 0 15px #00eaff;
+  }
+
+  /* canvas styling sa game area */
+  #gameCanvas {
+    background: linear-gradient(135deg, #111, #333);
+    display: block;
+    border: 3px solid #00eaff;
+    box-shadow: 0 0 25px #00eaff, 0 0 50px #00eaff;
+    border-radius: 10px;
+  }
+
+  /* game over overlay screen */
+  #overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(15, 15, 25, 0.85);
+    color: white;
+    display: none;
+    justify-content: center;
+    align-items: center;
+    flex-direction: column;
+    font-family: 'Orbitron', sans-serif;
+    z-index: 2;
+  }
+
+  /* game over text*/
+  #overlay h1 {
+    font-size: 60px;
+    margin-bottom: 20px;
+    text-shadow: 0 0 10px red, 0 0 20px orange;
+  }
+
+  /* final score text */
+  #overlay p {
+    font-size: 28px;
+    margin-bottom: 20px;
+  }
+
+  /* restart button */
+  #overlay button {
+    background: #00eaff;
+    border: none;
+    padding: 15px 35px;
+    font-size: 22px;
+    color: #000;
+    cursor: pointer;
+    border-radius: 8px;
+    box-shadow: 0 0 15px #00eaff;
+    transition: 0.3s;
+  }
+
+  #overlay button:hover {
+    background: #00c1cc;
+    box-shadow: 0 0 25px #00eaff;
+  }
+</style>
+</head>
+<body>
+
+<!-- scoreboard -->
+<div id="scoreBoard">Score: 0</div>
+
+<!-- game area -->
+<canvas id="gameCanvas" width="900" height="600"></canvas>
+
+<!-- game over-->
+<div id="overlay">
+  <h1>Game Over!</h1>
+  <p id="finalScore"></p>
+  <button Key Space="resetGame()">Restart</button>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+const scoreBoard = document.getElementById('scoreBoard');
+const overlay = document.getElementById('overlay');
+const finalScore = document.getElementById('finalScore');
+
+// player POV
+const player = {
+  x: 70,
+  y: 280,
+  width: 60,
+  height: 60,
+  color: 'lime',
+  speed: 7
+};
+
+//obstacle array
+const obstacleCount = 6;
+const obstacles = [];
+const obstacleWidth = 60;
+const obstacleHeight = 60;
+
+
+// Game state variables
+let keys = {};
+let score = 0;
+let gameOverFlag = false;
+
+
+let obstacleSpeed = 3;
+const maxObstacleSpeed = 15;
+const speedIncreaseInterval = 5000;
+
+// tighimo ug obstacle
+for (let i = 0; i < obstacleCount; i++) {
+  obstacles.push({
+    x: canvas.width + i * 250, //start off-screen
+    y: Math.random() * (canvas.height - obstacleHeight),
+    width: obstacleWidth,
+    height: obstacleHeight,
+    color: 'red',
+    passed: false //tracker if player passed obstacle
+  });
+}
+
+// increase speed every 5 seconds while game is running
+setInterval(() => {
+  if (!gameOverFlag && obstacleSpeed < maxObstacleSpeed) {
+    obstacleSpeed += 0.5;
+  }
+}, speedIncreaseInterval);
+
+window.addEventListener('keydown', (e) => { keys[e.key] = true; });
+window.addEventListener('keyup', (e) => { keys[e.key] = false; });
+
+function update() {
+  if (gameOverFlag) return; //stop if game is over
+
+  // player controls
+  if (keys['ArrowUp'] && player.y > 0) player.y -= player.speed;
+  if (keys['ArrowDown'] && player.y + player.height < canvas.height) player.y += player.speed;
+  if (keys['ArrowLeft'] && player.x > 0) player.x -= player.speed;
+  if (keys['ArrowRight'] && player.x + player.width < canvas.width) player.x += player.speed;
+
+  // move and reset obstacles
+  obstacles.forEach(obstacle => {
+    obstacle.x -= obstacleSpeed;
+
+    // respawn obstacle
+    if (obstacle.x + obstacle.width < 0) {
+      obstacle.x = canvas.width + Math.random() * 400;
+      obstacle.y = Math.random() * (canvas.height - obstacle.height);
+      obstacle.passed = false;
+    }
+
+    // increase score when passed
+    if (!obstacle.passed && player.x > obstacle.x + obstacle.width) {
+      score++;
+      scoreBoard.textContent = `Score: ${score}`;
+      obstacle.passed = true;
+    }
+
+    // collision detection
+    if (
+      player.x < obstacle.x + obstacle.width &&
+      player.x + player.width > obstacle.x &&
+      player.y < obstacle.y + obstacle.height &&
+      player.y + player.height > obstacle.y
+    ) {
+      gameOver();
+    }
+  });
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // glow effect for player
+  ctx.shadowBlur = 20;
+  ctx.shadowColor = player.color;
+  ctx.fillStyle = player.color;
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+
+  // glow effect for obstacles
+  obstacles.forEach(obstacle => {
+    ctx.shadowBlur = 25;
+    ctx.shadowColor = obstacle.color;
+    ctx.fillStyle = obstacle.color;
+    ctx.fillRect(obstacle.x, obstacle.y, obstacle.width, obstacle.height);
+  });
+
+  ctx.shadowBlur = 0;
+}
+
+//game over
+function gameOver() {
+  gameOverFlag = true;
+  finalScore.textContent = `Your Score: ${score}`;
+  overlay.style.display = "flex";
+}
+
+//restart
+function resetGame() {
+  score = 0;
+  scoreBoard.textContent = `Score: ${score}`;
+  player.x = 70;
+  player.y = 280;
+  obstacles.forEach((obstacle, i) => {
+    obstacle.x = canvas.width + i * 250;
+    obstacle.y = Math.random() * (canvas.height - obstacle.height);
+    obstacle.passed = false;
+  });
+  overlay.style.display = "none";
+  gameOverFlag = false;
+  obstacleSpeed = 3; // reset speed on restart
+}
+
+function gameLoop() {
+  update();
+  draw();
+  requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+</script>
+
+</body>
+</html>
